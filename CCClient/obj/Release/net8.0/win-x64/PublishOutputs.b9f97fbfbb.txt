@@ -1,0 +1,2 @@
+C:\workspace\CCClient\CCClient\bin\Release\net8.0\win-x64\publish\CCClient.pdb
+C:\workspace\CCClient\CCClient\bin\Release\net8.0\win-x64\publish\CCClient.exe

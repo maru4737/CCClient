@@ -1,0 +1,14 @@
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.GeneratedMSBuildEditorConfig.editorconfig
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.AssemblyInfoInputs.cache
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.AssemblyInfo.cs
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.csproj.CoreCompileInputs.cache
+C:\workspace\CCClient\CCClient\bin\Debug\net8.0\CCClient.exe
+C:\workspace\CCClient\CCClient\bin\Debug\net8.0\CCClient.deps.json
+C:\workspace\CCClient\CCClient\bin\Debug\net8.0\CCClient.runtimeconfig.json
+C:\workspace\CCClient\CCClient\bin\Debug\net8.0\CCClient.dll
+C:\workspace\CCClient\CCClient\bin\Debug\net8.0\CCClient.pdb
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.dll
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\refint\CCClient.dll
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.pdb
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.genruntimeconfig.cache
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\ref\CCClient.dll
