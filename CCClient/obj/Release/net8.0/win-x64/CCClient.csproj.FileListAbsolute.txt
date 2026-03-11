@@ -195,3 +195,4 @@ C:\workspace\CCClient\CCClient\obj\Release\net8.0\win-x64\refint\CCClient.dll
 C:\workspace\CCClient\CCClient\obj\Release\net8.0\win-x64\CCClient.pdb
 C:\workspace\CCClient\CCClient\obj\Release\net8.0\win-x64\CCClient.genruntimeconfig.cache
 C:\workspace\CCClient\CCClient\obj\Release\net8.0\win-x64\ref\CCClient.dll
+C:\workspace\CCClient\CCClient\obj\Release\net8.0\win-x64\CCClient.sourcelink.json

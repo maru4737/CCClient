@@ -1,21 +1,46 @@
-using System.Net.WebSockets;
+ï»¿using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using CCClient;
 
 Console.OutputEncoding = Encoding.UTF8;
 
+// ê³ ì • WS ì£¼ì†Œ
 var url = "wss://localhost:1502/ws";
 
-Console.Write("¹æ(roomId): ");
+// ëŒ€ì†Œë¬¸ì ì„ì—¬ë„ íŒŒì‹±ë˜ê²Œ
+var jsonOpt = new JsonSerializerOptions
+{
+    PropertyNameCaseInsensitive = true
+};
+
+// ì½˜ì†” ì¶œë ¥/ì…ë ¥ ì¶©ëŒ ì™„í™”
+var consoleLock = new object();
+string inputBuffer = "";
+
+// ì±„íŒ… ì¶œë ¥ í—¬í¼: ì…ë ¥ ì¤„ ì§€ìš°ê³  ë©”ì‹œì§€ ì¶œë ¥ í›„ í”„ë¡¬í”„íŠ¸ ë³µêµ¬
+void WriteChatLine(string line)
+{
+    lock (consoleLock)
+    {
+        var width = 120;
+        try { width = Math.Max(Console.WindowWidth - 1, 1); } catch { /* ignore */ }
+
+        Console.Write("\r" + new string(' ', width) + "\r");
+        Console.WriteLine(line);
+        Console.Write("> " + inputBuffer);
+    }
+}
+
+Console.Write("ë°©(RoomId): ");
 var roomId = Console.ReadLine()?.Trim();
 if (string.IsNullOrWhiteSpace(roomId))
 {
-    Console.WriteLine("roomId°¡ ÇÊ¿äÇÕ´Ï´Ù.");
+    Console.WriteLine("RoomIdê°€ í•„ìš”í•©ë‹ˆë‹¤.");
     return;
 }
 
-Console.Write("ÀÌ¸§(user): ");
+Console.Write("ì´ë¦„(user): ");
 var user = Console.ReadLine()?.Trim();
 if (string.IsNullOrWhiteSpace(user))
     user = "unknown";
@@ -38,20 +63,20 @@ Console.CancelKeyPress += (_, e) =>
 };
 
 Console.WriteLine();
-Console.WriteLine($"[Á¢¼Ó] {opt.ServerWsUri} / room={opt.RoomId}, user={opt.User}, afterSeq={afterSeq}");
-Console.WriteLine("¸í·É: /exit Á¾·á, /ping ÇÎ, ±×³É ÀÔ·ÂÇÏ¸é ¸Ş½ÃÁö Àü¼Û");
-Console.WriteLine();
+Console.WriteLine($"[ì ‘ì†] room={opt.RoomId}, user={opt.User}");
+Console.WriteLine("ëª…ë ¹: /exit ì¢…ë£Œ, /ping í•‘");
+Console.WriteLine("> ");
 
-await RunAsync(opt, afterSeq, seqStore, cts.Token);
+await RunAsync(opt, afterSeq, seqStore, jsonOpt, cts.Token);
 
-static async Task RunAsync(ClientOptions opt, long afterSeq, LastSeqStore seqStore, CancellationToken ct)
+async Task RunAsync(ClientOptions opt, long afterSeq, LastSeqStore seqStore, JsonSerializerOptions jsonOpt, CancellationToken ct)
 {
     using var ws = new ClientWebSocket();
 
-    // ¿¬°á
+    // ì—°ê²°
     await ws.ConnectAsync(opt.ServerWsUri, ct);
 
-    // join Àü¼Û
+    // join ì „ì†¡
     await SendAsync(ws, new WsClientEnvelope
     {
         Type = "join",
@@ -61,7 +86,7 @@ static async Task RunAsync(ClientOptions opt, long afterSeq, LastSeqStore seqSto
         AfterSeq = afterSeq
     }, ct);
 
-    // ¼ö½Å ·çÇÁ
+    // ìˆ˜ì‹  ë£¨í”„
     var receiveTask = Task.Run(async () =>
     {
         try
@@ -71,17 +96,21 @@ static async Task RunAsync(ClientOptions opt, long afterSeq, LastSeqStore seqSto
                 var json = await ReceiveTextAsync(ws, ct);
                 if (json is null) break;
 
-                HandleServerMessage(json, opt, seqStore);
+                HandleServerMessage(json, opt, seqStore, jsonOpt);
             }
         }
         catch (OperationCanceledException) { }
         catch (WebSocketException ex)
         {
-            Console.WriteLine($"[WS ¿À·ù] {ex.Message}");
+            WriteChatLine($"[ì—°ê²° ì¢…ë£Œ] {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            WriteChatLine($"[ì˜¤ë¥˜] {ex.Message}");
         }
     }, ct);
 
-    // ÀÔ·Â ·çÇÁ
+    // ì…ë ¥ ë£¨í”„
     try
     {
         while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
@@ -89,6 +118,7 @@ static async Task RunAsync(ClientOptions opt, long afterSeq, LastSeqStore seqSto
             var line = Console.ReadLine();
             if (line is null) continue;
 
+            inputBuffer = ""; // ReadLine ê¸°ë°˜ì´ë¼ ì‹¤ì‹œê°„ ì…ë ¥ ë²„í¼ëŠ” ì—†ìŒ
             line = line.TrimEnd();
 
             if (string.Equals(line, "/exit", StringComparison.OrdinalIgnoreCase))
@@ -108,6 +138,9 @@ static async Task RunAsync(ClientOptions opt, long afterSeq, LastSeqStore seqSto
                 Type = "send",
                 Text = line
             }, ct);
+
+            // ë‚´ ë©”ì‹œì§€ë„ ì±„íŒ…ì²˜ëŸ¼ ì¦‰ì‹œ ë³´ì—¬ì£¼ê³  ì‹¶ìœ¼ë©´ ì•„ë˜ ì£¼ì„ í•´ì œ(ì„œë²„ ì—ì½”ì™€ ì¤‘ë³µë  ìˆ˜ ìˆìŒ)
+            // WriteChatLine($"(me) {line}");
         }
     }
     finally
@@ -123,44 +156,48 @@ static async Task RunAsync(ClientOptions opt, long afterSeq, LastSeqStore seqSto
     }
 }
 
-static void HandleServerMessage(string json, ClientOptions opt, LastSeqStore seqStore)
+void HandleServerMessage(string json, ClientOptions opt, LastSeqStore seqStore, JsonSerializerOptions jsonOpt)
 {
     using var doc = JsonDocument.Parse(json);
     var root = doc.RootElement;
 
-    var type = root.TryGetProperty("type", out var t) ? t.GetString() : null;
-    var roomId = root.TryGetProperty("roomId", out var r) ? r.GetString() : null;
+    var type = GetString(root, "type") ?? GetString(root, "Type");
 
     if (string.Equals(type, "error", StringComparison.OrdinalIgnoreCase))
     {
-        var payload = root.TryGetProperty("payload", out var p) ? p.ToString() : "";
-        Console.WriteLine($"[¼­¹ö ¿À·ù] {payload}");
+        var payload = GetProperty(root, "payload") ?? GetProperty(root, "Payload");
+        WriteChatLine($"[ì„œë²„ ì˜¤ë¥˜] {payload?.ToString() ?? ""}");
         return;
     }
 
     if (string.Equals(type, "joined", StringComparison.OrdinalIgnoreCase))
     {
-        Console.WriteLine($"[joined] room={roomId}");
+        // join ë©”ì‹œì§€ëŠ” ì¡°ìš©íˆ ì²˜ë¦¬(ì›í•˜ë©´ ì¶œë ¥)
+        // var room = GetString(root, "roomId") ?? GetString(root, "RoomId");
+        // WriteChatLine($"[joined] room={room}");
         return;
     }
 
     if (string.Equals(type, "pong", StringComparison.OrdinalIgnoreCase))
     {
-        Console.WriteLine("[pong]");
+        // í•‘ ì‘ë‹µë„ ì¡°ìš©íˆ ì²˜ë¦¬(ì›í•˜ë©´ ì¶œë ¥)
+        // WriteChatLine("[pong]");
         return;
     }
 
-    if (!root.TryGetProperty("payload", out var payloadEl))
-        return;
+    var payloadEl = GetProperty(root, "payload") ?? GetProperty(root, "Payload");
+    if (payloadEl is null) return;
 
     if (string.Equals(type, "backlog", StringComparison.OrdinalIgnoreCase))
     {
-        // payload: array of ChatMessage
-        if (payloadEl.ValueKind != JsonValueKind.Array) return;
+        if (payloadEl.Value.ValueKind != JsonValueKind.Array) return;
 
-        foreach (var item in payloadEl.EnumerateArray())
+        foreach (var item in payloadEl.Value.EnumerateArray())
         {
-            var msg = item.Deserialize<ChatMessage>();
+            ChatMessage? msg;
+            try { msg = item.Deserialize<ChatMessage>(jsonOpt); }
+            catch { continue; }
+
             if (msg is null) continue;
 
             PrintMsg(msg, opt);
@@ -171,8 +208,10 @@ static void HandleServerMessage(string json, ClientOptions opt, LastSeqStore seq
 
     if (string.Equals(type, "message", StringComparison.OrdinalIgnoreCase))
     {
-        // payload: ChatMessage
-        var msg = payloadEl.Deserialize<ChatMessage>();
+        ChatMessage? msg;
+        try { msg = payloadEl.Value.Deserialize<ChatMessage>(jsonOpt); }
+        catch { return; }
+
         if (msg is null) return;
 
         PrintMsg(msg, opt);
@@ -181,26 +220,33 @@ static void HandleServerMessage(string json, ClientOptions opt, LastSeqStore seq
     }
 }
 
-static void PrintMsg(ChatMessage msg, ClientOptions opt)
+JsonElement? GetProperty(JsonElement root, string name)
+    => root.TryGetProperty(name, out var v) ? v : (JsonElement?)null;
+
+string? GetString(JsonElement root, string name)
+    => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+void PrintMsg(ChatMessage msg, ClientOptions opt)
 {
-    // ³»°¡ º¸³½ ¸Ş½ÃÁö´Â Ç¥½Ã¸¦ ´Ù¸£°Ô(¿øÇÏ¸é ÇÊÅÍ¸µ °¡´É)
     var mine = string.Equals(msg.SenderId, opt.SenderId, StringComparison.Ordinal);
 
-    var time = msg.Time.ToLocalTime().ToString("HH:mm:ss");
+    // ì‹œê°„ì€ ì·¨í–¥ì´ì§€ë§Œ ì±„íŒ…ì²˜ëŸ¼ ë³´ì´ê²Œ ì§§ê²Œ
+    var time = msg.Time.ToLocalTime().ToString("HH:mm");
+
     if (mine)
-        Console.WriteLine($"[{time}] (me) {msg.Text}  (seq={msg.Seq})");
+        WriteChatLine($"[{time}] (me) {msg.Text}");
     else
-        Console.WriteLine($"[{time}] {msg.User}: {msg.Text}  (seq={msg.Seq})");
+        WriteChatLine($"[{time}] {msg.User}: {msg.Text}");
 }
 
-static async Task SendAsync(ClientWebSocket ws, WsClientEnvelope env, CancellationToken ct)
+async Task SendAsync(ClientWebSocket ws, WsClientEnvelope env, CancellationToken ct)
 {
     var json = JsonSerializer.Serialize(env);
     var bytes = Encoding.UTF8.GetBytes(json);
     await ws.SendAsync(bytes, WebSocketMessageType.Text, endOfMessage: true, ct);
 }
 
-static async Task<string?> ReceiveTextAsync(ClientWebSocket ws, CancellationToken ct)
+async Task<string?> ReceiveTextAsync(ClientWebSocket ws, CancellationToken ct)
 {
     var buffer = new byte[8 * 1024];
     using var ms = new MemoryStream();
@@ -217,7 +263,7 @@ static async Task<string?> ReceiveTextAsync(ClientWebSocket ws, CancellationToke
             break;
 
         if (ms.Length > 256 * 1024)
-            return null; // ¾ÈÀüÀåÄ¡
+            return null;
     }
 
     return Encoding.UTF8.GetString(ms.ToArray());

@@ -12,3 +12,4 @@ C:\workspace\CCClient\CCClient\obj\Debug\net8.0\refint\CCClient.dll
 C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.pdb
 C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.genruntimeconfig.cache
 C:\workspace\CCClient\CCClient\obj\Debug\net8.0\ref\CCClient.dll
+C:\workspace\CCClient\CCClient\obj\Debug\net8.0\CCClient.sourcelink.json

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CCClient")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+37e37bc62fe48287164c2f8965207cafe587899b")]
 [assembly: System.Reflection.AssemblyProductAttribute("CCClient")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CCClient")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

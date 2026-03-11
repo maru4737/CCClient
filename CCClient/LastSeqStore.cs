@@ -13,12 +13,12 @@ public sealed class LastSeqStore
         _map = Load(path);
     }
 
-    public long Get(string roomId)
-        => _map.TryGetValue(roomId, out var v) ? v : 0;
+    public long Get(string RoomId)
+        => _map.TryGetValue(RoomId, out var v) ? v : 0;
 
-    public void Set(string roomId, long seq)
+    public void Set(string RoomId, long seq)
     {
-        _map[roomId] = seq;
+        _map[RoomId] = seq;
         Save(_path, _map);
     }
 
