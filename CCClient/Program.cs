@@ -6,7 +6,7 @@ using CCClient;
 Console.OutputEncoding = Encoding.UTF8;
 
 // 고정 WS 주소
-var url = "wss://localhost:1502/ws";
+var url = "wss://211.188.52.188:5170/ws";
 
 // 대소문자 섞여도 파싱되게
 var jsonOpt = new JsonSerializerOptions
