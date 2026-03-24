@@ -6,7 +6,7 @@ using CCClient;
 Console.OutputEncoding = Encoding.UTF8;
 
 // 고정 WS 주소
-var url = "wss://211.188.52.188:5170/ws";
+var url = "ws://116.39.236.154/ws";
 
 // 대소문자 섞여도 파싱되게
 var jsonOpt = new JsonSerializerOptions
@@ -73,8 +73,26 @@ async Task RunAsync(ClientOptions opt, long afterSeq, LastSeqStore seqStore, Jso
 {
     using var ws = new ClientWebSocket();
 
-    // 연결
-    await ws.ConnectAsync(opt.ServerWsUri, ct);
+    try
+    {
+        Console.WriteLine($"[연결시도] {opt.ServerWsUri}");
+
+        await ws.ConnectAsync(opt.ServerWsUri, ct);
+
+        Console.WriteLine($"[연결성공] State={ws.State}");
+    }
+    catch (WebSocketException ex)
+    {
+        Console.WriteLine("[WebSocketException]");
+        Console.WriteLine($"Message: {ex.Message}");
+        Console.WriteLine($"WebSocketErrorCode: {ex.WebSocketErrorCode}");
+        Console.WriteLine(ex);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("[Exception]");
+        Console.WriteLine(ex);
+    }
 
     // join 전송
     await SendAsync(ws, new WsClientEnvelope
@@ -239,11 +257,75 @@ void PrintMsg(ChatMessage msg, ClientOptions opt)
         WriteChatLine($"[{time}] {msg.User}: {msg.Text}");
 }
 
-async Task SendAsync(ClientWebSocket ws, WsClientEnvelope env, CancellationToken ct)
+static async Task<bool> TrySendAsync(ClientWebSocket? ws, WsClientEnvelope env, CancellationToken ct)
 {
-    var json = JsonSerializer.Serialize(env);
-    var bytes = Encoding.UTF8.GetBytes(json);
-    await ws.SendAsync(bytes, WebSocketMessageType.Text, endOfMessage: true, ct);
+    if (ws is null)
+    {
+        Console.WriteLine("[전송실패] WebSocket 인스턴스가 null 입니다.");
+        return false;
+    }
+
+    try
+    {
+        if (ws.State != WebSocketState.Open)
+        {
+            Console.WriteLine($"[전송실패] WebSocket 상태가 Open이 아닙니다. State={ws.State}");
+            return false;
+        }
+
+        var json = JsonSerializer.Serialize(env);
+        var bytes = Encoding.UTF8.GetBytes(json);
+
+        await ws.SendAsync(
+            new ArraySegment<byte>(bytes),
+            WebSocketMessageType.Text,
+            endOfMessage: true,
+            cancellationToken: ct);
+
+        return true;
+    }
+    catch (ObjectDisposedException)
+    {
+        Console.WriteLine("[전송실패] WebSocket이 이미 Dispose 되었습니다.");
+        return false;
+    }
+    catch (WebSocketException ex)
+    {
+        Console.WriteLine($"[전송실패] WebSocketException: {ex.Message}");
+        return false;
+    }
+}
+static async Task SendAsync(ClientWebSocket ws, WsClientEnvelope env, CancellationToken ct)
+{
+    ArgumentNullException.ThrowIfNull(ws);
+    ArgumentNullException.ThrowIfNull(env);
+
+    // Dispose 된 객체는 State 접근/SendAsync 시 예외가 날 수 있으므로 예외 처리 포함
+    try
+    {
+        if (ws.State != WebSocketState.Open)
+        {
+            throw new InvalidOperationException(
+                $"WebSocket이 열린 상태가 아닙니다. CurrentState={ws.State}");
+        }
+
+        var json = JsonSerializer.Serialize(env);
+        var bytes = Encoding.UTF8.GetBytes(json);
+
+        await ws.SendAsync(
+            new ArraySegment<byte>(bytes),
+            WebSocketMessageType.Text,
+            endOfMessage: true,
+            cancellationToken: ct);
+    }
+    catch (ObjectDisposedException ex)
+    {
+        throw new InvalidOperationException("WebSocket이 이미 Dispose 되어 전송할 수 없습니다.", ex);
+    }
+    catch (WebSocketException ex)
+    {
+        throw new InvalidOperationException("WebSocket 전송 중 오류가 발생했습니다.", ex);
+    }
 }
 
 async Task<string?> ReceiveTextAsync(ClientWebSocket ws, CancellationToken ct)
