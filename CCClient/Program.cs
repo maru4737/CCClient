@@ -1,7 +1,10 @@
-﻿using System.Net.WebSockets;
+﻿using CCClient;
+using Microsoft.Toolkit.Uwp.Notifications;
+using System.Net.WebSockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
-using CCClient;
+using Windows.UI.Notifications;
 
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -17,6 +20,7 @@ var jsonOpt = new JsonSerializerOptions
 // 콘솔 출력/입력 충돌 완화
 var consoleLock = new object();
 string inputBuffer = "";
+var printedSeq = new HashSet<long>();
 
 // 채팅 출력 헬퍼: 입력 줄 지우고 메시지 출력 후 프롬프트 복구
 void WriteChatLine(string line)
@@ -151,10 +155,21 @@ async Task RunAsync(ClientOptions opt, long afterSeq, LastSeqStore seqStore, Jso
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+
+            ClearPreviousConsoleLine();
+
+            var now = DateTime.Now.ToString("HH:mm");
+            WriteChatLine($"[{now}] {opt.User}: {line}");
+
             await SendAsync(ws, new WsClientEnvelope
             {
                 Type = "send",
-                Text = line
+                Text = line,
+                SenderId = opt.SenderId, // 가능하면 같이 보내는 게 안전
+                User = opt.User,
+                RoomId = opt.RoomId
             }, ct);
 
             // 내 메시지도 채팅처럼 즉시 보여주고 싶으면 아래 주석 해제(서버 에코와 중복될 수 있음)
@@ -246,17 +261,27 @@ string? GetString(JsonElement root, string name)
 
 void PrintMsg(ChatMessage msg, ClientOptions opt)
 {
+    bool TryMarkPrinted(ChatMessage msg)
+    {
+        lock (printedSeq)
+        {
+            return printedSeq.Add(msg.Seq);
+        }
+    }
+
+    if (!TryMarkPrinted(msg))
+        return;
+
     var mine = string.Equals(msg.SenderId, opt.SenderId, StringComparison.Ordinal);
-
-    // 시간은 취향이지만 채팅처럼 보이게 짧게
-    var time = msg.Time.ToLocalTime().ToString("HH:mm");
-
     if (mine)
-        WriteChatLine($"[{time}] (me) {msg.Text}");
-    else
-        WriteChatLine($"[{time}] {msg.User}: {msg.Text}");
-}
+        return;
 
+    var time = msg.Time.ToLocalTime().ToString("HH:mm");
+    var line = $"[{time}] {msg.User}: {msg.Text}";
+
+    WriteChatLine(line);
+    ShowWindowsToast(msg.User ?? "새 메시지", msg.Text ?? string.Empty, msg.SenderId ?? "unknown");
+}
 static async Task<bool> TrySendAsync(ClientWebSocket? ws, WsClientEnvelope env, CancellationToken ct)
 {
     if (ws is null)
@@ -350,3 +375,44 @@ async Task<string?> ReceiveTextAsync(ClientWebSocket ws, CancellationToken ct)
 
     return Encoding.UTF8.GetString(ms.ToArray());
 }
+
+static void ShowWindowsToast(string title, string message, string senderId)
+{
+    try
+    {
+        var content = new ToastContentBuilder()
+            .AddText(title)
+            .AddText(message)
+            .GetToastContent();
+
+        var toast = new ToastNotification(content.GetXml())
+        {
+            Tag = $"chat-{senderId}",   // 같은 상대는 같은 Tag
+            Group = "chat-message"      // 같은 그룹
+        };
+
+        ToastNotificationManagerCompat.CreateToastNotifier().Show(toast);
+    }
+    catch (Exception ex)
+    {
+    }
+}
+
+static void ClearPreviousConsoleLine()
+{
+    // 현재 커서가 0번째 줄이면 지울 줄이 없음
+    if (Console.CursorTop == 0)
+        return;
+
+    var previousLine = Console.CursorTop - 1;
+
+    // 이전 줄의 시작으로 이동
+    Console.SetCursorPosition(0, previousLine);
+
+    // 콘솔 한 줄 전체를 공백으로 덮어씀
+    Console.Write(new string(' ', Console.BufferWidth - 1));
+
+    // 다시 이전 줄 시작 위치로 이동
+    Console.SetCursorPosition(0, previousLine);
+}
+
